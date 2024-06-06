@@ -6,7 +6,7 @@ output:
     vertical_layout: fill
     theme: 
       version: 4
-      bootswatch: spacelab # yeti is also nice
+      bootswatch: yeti 
   
 # This code is inspired by Matt Dray's example using education data
 # https://matt-dray.github.io/earl18-crosstalk/04_leaflet-flexdash-dt-crosstalk.html
@@ -22,8 +22,8 @@ library(leaflet)
 library(DT)
 library(crosstalk) 
 library(dplyr)
-library(popmodules)
-library(gglaplot)
+#library(popmodules)
+#library(gglaplot)
 library(ggplot2)
 library(data.table)
 library(tidyr)
@@ -33,9 +33,7 @@ library(tidyverse)
 library(plotly)
 library(sf)
 library(htmlwidgets)
-library(ggplot2)
-library(gglaplot)
-library(glaly)
+#library(glaly)
 library(knitr)
 library(leaflet.extras)
 library(leaflegend)
@@ -56,710 +54,400 @@ data_dir <- 'DATA/'
 #---------------------------------------------------------
 #THIS CODE COULD GO INTO DATAMANIP FILE
 
-# input data about dispersal, pledges, UASC and population
-input_peopledata <- fread(paste0(data_dir,"People_Data_all_ed.csv"))%>% 
-  data.frame()
+# # input data about dispersal, pledges, UASC and population
+# input_peopledata <- fread(paste0(data_dir,"People_Data_all_ed.csv"))%>% 
+#   data.frame()
+# 
+# # Import borough boundaries
+# borough_boundaries<-
+#   st_read(paste0(data_dir,"London_Borough_Excluding_MHW.shp"))
+# 
+# # For leaflet map, change projection from GB OS grid to the standard World Geodetic System which uses lats and longs.
+# boroughs_WGS84 <- st_transform(borough_boundaries, 4326)
+# 
+# # Match with geographical data, create categories for mapping and drop unwanted variables
+# Data_geog_WGS84 <- boroughs_WGS84%>% 
+#   left_join(input_peopledata, by=c("GSS_CODE"="BoroughCode"))%>%
+#   mutate(DispersalCat = cut(Rate_of_DA, breaks = c(-1, 0, 35, 70, 140, 300),
+#                            labels = c("1", "2", "3", "4", "5"))) %>%
+#   mutate(UASC_Colour = recode(UASC_Col, 
+#                               "Green" = "1", 
+#                               "Amber" = "2", 
+#                               "Red" = "3", 
+#                               "Purple" = "4")) %>%
+#   mutate(PopCat = cut(Pop_total_2020, breaks = c(-1, 100000, 200000, 300000, 400000),
+#                            labels = c("1", "2", "3", "4"))) %>%
+#   select(!c("HECTARES", "BoroughName", "NONLD_AREA", "ONS_INNER", "SUB_2009", "SUB_2006")) 
+# 
+# # add unique ID to each row to help with matching
+# Data_geog_WGS84 <- tibble::rowid_to_column(Data_geog_WGS84, "index")
+# 
+# # Create centroids for mapping using coordinates of lats and longs, and create index for matching  
+# cent <- st_transform(Data_geog_WGS84, crs = 4326) %>%
+#   st_centroid() %>% 
+#   st_geometry() %>% 
+#   as_tibble() %>% # convert list to tibble 
+#   extract(geometry, c('long', 'lat'), '\\((.*), (.*)\\)', convert = TRUE) %>%
+#   rowid_to_column("index")
+# 
+# # Merge original data file with new centroid data
+# Data_geog_WGS84_cent <- merge(Data_geog_WGS84, cent, by="index")
+# 
+# # Convert data for use in DT and crosstalk
+# shared_migration_data <- SharedData$new(Data_geog_WGS84_cent)
+# 
+# #--------------------------------------------------------------------------
+# 
+# ## Provide extra info for choropleth maps
+# 
+# # For dispersal map
+# catblue5 = c('#eeeeee', '#a6bbd4', '#6e88a6', '#44586f', '#252c35')
+# 
+# catnames_new <- c("0", "1-34", "35 - 69", "70-139", "140-300")
+# 
+# mypalette2 <- colorFactor(catblue5,
+#                           levels = c("1", "2", "3", "4", "5"),
+#                           ordered = FALSE,
+#                           na.color = "#808080",
+#                           alpha = FALSE,
+#                           reverse = FALSE)
 
-# Import borough boundaries
-borough_boundaries<-
-  st_read(paste0(data_dir,"London_Borough_Excluding_MHW.shp"))
-
-# For leaflet map, change projection from GB OS grid to the standard World Geodetic System which uses lats and longs.
-boroughs_WGS84 <- st_transform(borough_boundaries, 4326)
-
-# Match with geographical data, create categories for mapping and drop unwanted variables
-Data_geog_WGS84 <- boroughs_WGS84%>% 
-  left_join(input_peopledata, by=c("GSS_CODE"="BoroughCode"))%>%
-  mutate(DispersalCat = cut(Rate_of_DA, breaks = c(-1, 0, 35, 70, 140, 300),
-                           labels = c("1", "2", "3", "4", "5"))) %>%
-  mutate(UASC_Colour = recode(UASC_Col, 
-                              "Green" = "1", 
-                              "Amber" = "2", 
-                              "Red" = "3", 
-                              "Purple" = "4")) %>%
-  mutate(PopCat = cut(Pop_total_2020, breaks = c(-1, 100000, 200000, 300000, 400000),
-                           labels = c("1", "2", "3", "4"))) %>%
-  select(!c("HECTARES", "BoroughName", "NONLD_AREA", "ONS_INNER", "SUB_2009", "SUB_2006")) 
-
-# add unique ID to each row to help with matching
-Data_geog_WGS84 <- tibble::rowid_to_column(Data_geog_WGS84, "index")
-
-# Create centroids for mapping using coordinates of lats and longs, and create index for matching  
-cent <- st_transform(Data_geog_WGS84, crs = 4326) %>%
-  st_centroid() %>% 
-  st_geometry() %>% 
-  as_tibble() %>% # convert list to tibble 
-  extract(geometry, c('long', 'lat'), '\\((.*), (.*)\\)', convert = TRUE) %>%
-  rowid_to_column("index")
-
-# Merge original data file with new centroid data
-Data_geog_WGS84_cent <- merge(Data_geog_WGS84, cent, by="index")
-
-# Convert data for use in DT and crosstalk
-shared_migration_data <- SharedData$new(Data_geog_WGS84_cent)
-
-#--------------------------------------------------------------------------
-
-## Provide extra info for choropleth maps
-
-# For dispersal map
-catblue5 = c('#eeeeee', '#a6bbd4', '#6e88a6', '#44586f', '#252c35')
-
-catnames_new <- c("0", "1-34", "35 - 69", "70-139", "140-300")
-
-mypalette2 <- colorFactor(catblue5,
-                          levels = c("1", "2", "3", "4", "5"),
-                          ordered = FALSE,
-                          na.color = "#808080",
-                          alpha = FALSE,
-                          reverse = FALSE)
-# For UASC map
-UASC_catcolor = c("#7fc97f", "#fdc086", "#fb8072") # no need for "#7570b3"
-
-#7fc97f is green, #fdc086 is orange and #fb8072 is red (no need for purple)
-
-UASC_catnames <- c("Below 0.07%", "0.07 - 0.09%", "> or = 0.10%")
-
-mypalette3 <- colorFactor(UASC_catcolor,
-                          levels = c("1", "2", "3"),
-                          ordered = FALSE,
-                          na.color = "#808080",
-                          alpha = FALSE,
-                          reverse = FALSE)
-
-# For population map (currently not included)
-catgreen4 = c('#eeeeee', '#acc1aa', '#739272', '#4a6349')
-
-popCat_names <- c("0 - 99K", "100 - 199K", "200 - 299K", "300 - 400K")
-
-mypalette4 <- colorFactor(catgreen4,
-                          levels = c("1", "2", "3", "4"),
-                          ordered = FALSE,
-                          na.color = "#808080",
-                          alpha = FALSE,
-                          reverse = FALSE)
 
 ```
 
 Schools {data-icon="ion-home"}
 =====================================  
 
-### Name of topic being mapped
+### Primary and Secondary Schools (state-funded) headcount
 
 Row {data-height=500}
 -----------------------------------------------------------------------
 
-### First Interactive Line chart - primary schools numbers over time
+### Line chart - Primary schools numbers over time
 
 ```{r chart1}
 
+# chart
+
 ```
 
-### Second Interactive Line chart - secondary schools numbers over time
+### Line chart - Secondary schools numbers over time
 
 ```{r chart2}
 
+# chart
+
 ```
 
 Row {data-height=500}
 -----------------------------------------------------------------------
 
-### First Interactive map - primary schools change
+### Map - Primary schools change
 
 ```{r map1}
 
+# map
+
+
 ```
 
-### Second Interactive map - secondary schools change
+### Map - Secondary schools change
 
 ```{r map2}
 
+# map
 
 ```
 
-Total fertility rate {data-navmenu="🕮 Births" data-icon="ion-stats-bars"}
+Births and total fertility rate {data-navmenu="🕮 Births" data-icon="ion-stats-bars"}
 =====================================  
 
-### 
+### Births and total fertility rate
 
 Row {data-height=500}
 -----------------------------------------------------------------------
 
-### First Interactive Line chart - Births over time
+### Line chart - Births over time
 
 ```{r chart3}
 
+# chart
 
 ```
 
-### Second Interactive Line chart - TFR over time
+### Line chart - TFR over time
 
 ```{r chart4}
 
+#chart
 
 ```
 Row {data-height=500}
 -----------------------------------------------------------------------
 
-### Third Interactive Line chart - Number of potential mothers over time
+### Line chart - Number of potential mothers over time
 
 ```{r chart5}
 
+#chart
 
 ```
-### First Interactive map - TFR now
+### Map - TFR now
 
 ```{r map3}
 
 ## Map for Dispersal accomodation
 
-dispersal_map <- leaflet(shared_migration_data) %>% 
-  setView(lng = -0.1181 , lat = 51.51, zoom = 9) %>% # 
-  addProviderTiles(providers$CartoDB.Positron) %>% 
-  addPolygons(fillColor = ~mypalette2(DispersalCat),
-                 weight = 0.5,
-                 opacity = 1,
-                 color = "black",
-                fillOpacity = 0.7) %>%
-  addLegend("bottomleft", 
-            colors = catblue5, 
-            values = DispersalCat, 
-            labels = catnames_new, title = "Dispersed acc., Asylum seekers/100,000 residents") %>%
-  addAwesomeMarkers(data = shared_migration_data, 
-             lng =  ~ long, lat = ~ lat, 
-               popup = ~paste0(
-       "<h4>", Data_geog_WGS84_cent$NAME, "</h4>",
-      
-      "<table style='width:100%'>",
-      
-      "<tr>",
-      "<th>Number in dispersal</th>",
-      "<th>", Data_geog_WGS84_cent$SeekingAsylum_InDispersal,"</tr>",
-      "</tr>",
-      
-      "<tr>",
-      "<tr>",
-      "<th>Borough population</th>",
-      "<th>", format(Data_geog_WGS84_cent$Pop_total_2020, big.mark = ",", scientific = FALSE)  ,
-      "</tr>",
-      
-      "<tr>",
-      "<tr>",
-      "<th>Rate of dispersal accomodation<br>per 100,000 residents</th>",
-      "<th>", Data_geog_WGS84_cent$Rate_of_DA, "</tr>",
-      "</tr>"
-          ),  # end popup()
-    icon = awesomeIcons(
-      library = "ion",
-      icon = "ion-android-radio-button-on",
-      iconColor = "white",
-      markerColor = ifelse(
-        test = Data_geog_WGS84_cent$Inner == 1, 
-        yes = "red",
-        no = "blue")
-      )
-    )    # end addAwesomeMarkers()
-dispersal_map
+# dispersal_map <- leaflet(shared_migration_data) %>% 
+#   setView(lng = -0.1181 , lat = 51.51, zoom = 9) %>% # 
+#   addProviderTiles(providers$CartoDB.Positron) %>% 
+#   addPolygons(fillColor = ~mypalette2(DispersalCat),
+#                  weight = 0.5,
+#                  opacity = 1,
+#                  color = "black",
+#                 fillOpacity = 0.7) %>%
+#   addLegend("bottomleft", 
+#             colors = catblue5, 
+#             values = DispersalCat, 
+#             labels = catnames_new, title = "Dispersed acc., Asylum seekers/100,000 residents") %>%
+#   addAwesomeMarkers(data = shared_migration_data, 
+#              lng =  ~ long, lat = ~ lat, 
+#                popup = ~paste0(
+#        "<h4>", Data_geog_WGS84_cent$NAME, "</h4>",
+#       
+#       "<table style='width:100%'>",
+#       
+#       "<tr>",
+#       "<th>Number in dispersal</th>",
+#       "<th>", Data_geog_WGS84_cent$SeekingAsylum_InDispersal,"</tr>",
+#       "</tr>",
+#       
+#       "<tr>",
+#       "<tr>",
+#       "<th>Borough population</th>",
+#       "<th>", format(Data_geog_WGS84_cent$Pop_total_2020, big.mark = ",", scientific = FALSE)  ,
+#       "</tr>",
+#       
+#       "<tr>",
+#       "<tr>",
+#       "<th>Rate of dispersal accomodation<br>per 100,000 residents</th>",
+#       "<th>", Data_geog_WGS84_cent$Rate_of_DA, "</tr>",
+#       "</tr>"
+#           ),  # end popup()
+#     icon = awesomeIcons(
+#       library = "ion",
+#       icon = "ion-android-radio-button-on",
+#       iconColor = "white",
+#       markerColor = ifelse(
+#         test = Data_geog_WGS84_cent$Inner == 1, 
+#         yes = "red",
+#         no = "blue")
+#       )
+#     )    # end addAwesomeMarkers()
+# dispersal_map
 
 ```
 
-Fertility {data-navmenu="🕮 Births" data-icon="ion-connection-bars"}
+Age specific fertility rate and Mean age at birth {data-navmenu="🕮 Births" data-icon="ion-connection-bars"}
 =====================================  
 
-### ASFR
+### Age specific fertility rate and Mean age at birth
 
 Row {data-height=500}
 -----------------------------------------------------------------------
-### First Interactive Line chart - ASFR over time
+
+### Line chart - ASFR over time
 
 ```{r chart6}
 
+# ASFR chart
 
 ```
 
-### Second Interactive Line chart - SMA over time
+### Line chart - SMA over time
 
 ```{r chart7}
 
+# SMA chart
 
 ```
 Row {data-height=500}
-
 -----------------------------------------------------------------------
-### First Interactive map - TFR
 
+### Map - ASFR
+ 
 ```{r map4}
+ 
+# UASC_map <- leaflet(shared_migration_data) %>% 
+#   setView(lng = -0.1181 , lat = 51.51, zoom =9) %>% # 
+#   addProviderTiles(providers$CartoDB.Positron) %>% 
+#   addPolygons(fillColor = ~mypalette3(UASC_Colour),
+#                  weight = 0.5,
+#                  opacity = 0.8,
+#                  color = "black",
+#                 fillOpacity = 0.5) %>%
+#   addLegend("bottomleft", 
+#             colors = UASC_catcolor, 
+#             values = UASC_Cat, 
+#             labels = UASC_catnames , title = "UASC Categories: 0.07% Threshold")%>%
+#   addAwesomeMarkers(data = shared_migration_data, 
+#              lng =  ~ long, lat = ~ lat, 
+#                popup = ~paste0(
+#        "<h4>", Data_geog_WGS84_cent$NAME, "</h4>",
+#       
+#       "<table style='width:100%'>",
+#       
+#       "<tr>",
+#       "<th>UASC in borough</th>",
+#       "<th>", Data_geog_WGS84_cent$UASC,
+#       "</tr>",
+#       
+#       "<tr>",
+#       "<tr>",
+#       "<th>Borough <18 y.o. population</th>",
+#       "<th>", format(Data_geog_WGS84_cent$Pop_child_2020, big.mark = ",", scientific = FALSE),
+#       "</tr>",
+#       
+#       "<tr>",
+#       "<tr>",
+#       "<th>Rate of UASC<br>per 100 children</th>",
+#       "<th>", format(round(Data_geog_WGS84_cent$UASC_Rate, 2)), "</th>",
+#       "</tr>"
+#           ),  # end popup()
+#     icon = awesomeIcons(
+#       library = "ion",
+#       icon = "ion-android-radio-button-on",
+#       iconColor = "white",
+#       markerColor = ifelse(
+#         test = Data_geog_WGS84_cent$Inner == 1, 
+#         yes = "red",
+#         no = "blue")
+#       )
+#     )    # end addAwesomeMarkers()
+# UASC_map
 
-UASC_map <- leaflet(shared_migration_data) %>% 
-  setView(lng = -0.1181 , lat = 51.51, zoom =9) %>% # 
-  addProviderTiles(providers$CartoDB.Positron) %>% 
-  addPolygons(fillColor = ~mypalette3(UASC_Colour),
-                 weight = 0.5,
-                 opacity = 0.8,
-                 color = "black",
-                fillOpacity = 0.5) %>%
-  addLegend("bottomleft", 
-            colors = UASC_catcolor, 
-            values = UASC_Cat, 
-            labels = UASC_catnames , title = "UASC Categories: 0.07% Threshold")%>%
-  addAwesomeMarkers(data = shared_migration_data, 
-             lng =  ~ long, lat = ~ lat, 
-               popup = ~paste0(
-       "<h4>", Data_geog_WGS84_cent$NAME, "</h4>",
-      
-      "<table style='width:100%'>",
-      
-      "<tr>",
-      "<th>UASC in borough</th>",
-      "<th>", Data_geog_WGS84_cent$UASC,
-      "</tr>",
-      
-      "<tr>",
-      "<tr>",
-      "<th>Borough <18 y.o. population</th>",
-      "<th>", format(Data_geog_WGS84_cent$Pop_child_2020, big.mark = ",", scientific = FALSE),
-      "</tr>",
-      
-      "<tr>",
-      "<tr>",
-      "<th>Rate of UASC<br>per 100 children</th>",
-      "<th>", format(round(Data_geog_WGS84_cent$UASC_Rate, 2)), "</th>",
-      "</tr>"
-          ),  # end popup()
-    icon = awesomeIcons(
-      library = "ion",
-      icon = "ion-android-radio-button-on",
-      iconColor = "white",
-      markerColor = ifelse(
-        test = Data_geog_WGS84_cent$Inner == 1, 
-        yes = "red",
-        no = "blue")
-      )
-    )    # end addAwesomeMarkers()
-UASC_map
 ```
-### Second Interactive map - SMA
-
+### Map - SMA
+ 
 ```{r map5}
-
-UASC_map <- leaflet(shared_migration_data) %>% 
-  setView(lng = -0.1181 , lat = 51.51, zoom =9) %>% # 
-  addProviderTiles(providers$CartoDB.Positron) %>% 
-  addPolygons(fillColor = ~mypalette3(UASC_Colour),
-                 weight = 0.5,
-                 opacity = 0.8,
-                 color = "black",
-                fillOpacity = 0.5) %>%
-  addLegend("bottomleft", 
-            colors = UASC_catcolor, 
-            values = UASC_Cat, 
-            labels = UASC_catnames , title = "UASC Categories: 0.07% Threshold")%>%
-  addAwesomeMarkers(data = shared_migration_data, 
-             lng =  ~ long, lat = ~ lat, 
-               popup = ~paste0(
-       "<h4>", Data_geog_WGS84_cent$NAME, "</h4>",
-      
-      "<table style='width:100%'>",
-      
-      "<tr>",
-      "<th>UASC in borough</th>",
-      "<th>", Data_geog_WGS84_cent$UASC,
-      "</tr>",
-      
-      "<tr>",
-      "<tr>",
-      "<th>Borough <18 y.o. population</th>",
-      "<th>", format(Data_geog_WGS84_cent$Pop_child_2020, big.mark = ",", scientific = FALSE),
-      "</tr>",
-      
-      "<tr>",
-      "<tr>",
-      "<th>Rate of UASC<br>per 100 children</th>",
-      "<th>", format(round(Data_geog_WGS84_cent$UASC_Rate, 2)), "</th>",
-      "</tr>"
-          ),  # end popup()
-    icon = awesomeIcons(
-      library = "ion",
-      icon = "ion-android-radio-button-on",
-      iconColor = "white",
-      markerColor = ifelse(
-        test = Data_geog_WGS84_cent$Inner == 1, 
-        yes = "red",
-        no = "blue")
-      )
-    )    # end addAwesomeMarkers()
-UASC_map
+# 
+# UASC_map <- leaflet(shared_migration_data) %>% 
+#   setView(lng = -0.1181 , lat = 51.51, zoom =9) %>% # 
+#   addProviderTiles(providers$CartoDB.Positron) %>% 
+#   addPolygons(fillColor = ~mypalette3(UASC_Colour),
+#                  weight = 0.5,
+#                  opacity = 0.8,
+#                  color = "black",
+#                 fillOpacity = 0.5) %>%
+#   addLegend("bottomleft", 
+#             colors = UASC_catcolor, 
+#             values = UASC_Cat, 
+#             labels = UASC_catnames , title = "UASC Categories: 0.07% Threshold")%>%
+#   addAwesomeMarkers(data = shared_migration_data, 
+#              lng =  ~ long, lat = ~ lat, 
+#                popup = ~paste0(
+#        "<h4>", Data_geog_WGS84_cent$NAME, "</h4>",
+#       
+#       "<table style='width:100%'>",
+#       
+#       "<tr>",
+#       "<th>UASC in borough</th>",
+#       "<th>", Data_geog_WGS84_cent$UASC,
+#       "</tr>",
+#       
+#       "<tr>",
+#       "<tr>",
+#       "<th>Borough <18 y.o. population</th>",
+#       "<th>", format(Data_geog_WGS84_cent$Pop_child_2020, big.mark = ",", scientific = FALSE),
+#       "</tr>",
+#       
+#       "<tr>",
+#       "<tr>",
+#       "<th>Rate of UASC<br>per 100 children</th>",
+#       "<th>", format(round(Data_geog_WGS84_cent$UASC_Rate, 2)), "</th>",
+#       "</tr>"
+#           ),  # end popup()
+#     icon = awesomeIcons(
+#       library = "ion",
+#       icon = "ion-android-radio-button-on",
+#       iconColor = "white",
+#       markerColor = ifelse(
+#         test = Data_geog_WGS84_cent$Inner == 1, 
+#         yes = "red",
+#         no = "blue")
+#       )
+#     )    # end addAwesomeMarkers()
+# UASC_map
 
 ```
-
 
 Migration  {data-icon="ion-person-stalker"}
 =====================================  
 
-### Name of topic being mapped
+### Migration statistics from MYE 2022
 
-Row {data-height=250}
+Column {data-width=500}
 -----------------------------------------------------------------------
 
-### Filters
+### Domestic migration
 
-```{r filters3}
+```{r chart8}
 
-```
+## Dom mig numbers from MYE
 
-Row {data-height=750}
------------------------------------------------------------------------
-
-### Interactive map
-
-```{r map3}
 
 ```
 
-### Datatable
+### International migration
 
-```{r datatable3}
+
+```{r chart9}
+
+### Int mig numbers from MYE 2022
 
 ```
 
-Housing Pressures {data-icon="ion-home"}
+Total population {data-icon="ion-home"}
 =====================================  
 
-### Name of topic being mapped
+### Total population of young children
 
-Row {data-height=250}
+
+Row {data-height=500}
 -----------------------------------------------------------------------
 
-### Filters
+### Map - Change in population 0 - 10
 
-```{r filters4}
+```{r map6}
+
+
+# Map - Change in population 0 - 10
 
 ```
 
-Row {data-height=750}
------------------------------------------------------------------------
+### Map - Change in HH with more than 1 dependent child
 
-### Interactive map
+```{r map7}
 
-```{r map4}
-
-```
-
-### Datatable
-
-```{r datatable4}
+# Map - Change in HH with more than 1 dependent child
 
 ```
 
-
-Hotels {data-icon="ion-briefcase"}
-=====================================  
-
-### HOTELS
-
-Row {data-width=300}
+Row {data-height=500}
 -----------------------------------------------------------------------
 
-### Interactive map
+### Map - Another topic
 
-```{r map5}
+```{r map8}
+# another map
 
-hotels_map <- leaflet(shared_hotel_data) %>% 
-  setView(lng = -0.1181 , lat = 51.51, zoom =10) %>% 
-  addPolygons(data = Data_geog_WGS84_cent,
-    fillColor = "white",
-    weight = 0.5,
-    opacity = 1,
-    color = "black",
-    fillOpacity = 0.5)%>%
-  addCircles(data = input_initialpostcodes, 
-             lng =  ~ long, lat = ~ lat, 
-             color = 'black',
-             #stroke = FALSE,  # this removes outlines to circles
-             fillColor = 'green', # Yellow
-             fillOpacity = 0.5,
-             weight = 1,
-             opacity = .8, # use fillOpacity = 0 if just want outlines
-             radius=~Extra_people*3) %>%
-#             popup=popupInitial,
-#             popupOptions = popupOptions(closeOnClick = TRUE)) %>%
-  addCircles(data = input_bridgingpostcodes, 
-             lng =  ~ long, lat = ~ lat, 
-             color = 'black',
-             #stroke = FALSE,  # this removes outlines to circles
-             fillColor = '#dee000', # Yellow
-             weight = 1,
-             fillOpacity = 0.5,
-             opacity = .8, # use fillOpacity = 0 if just want outlines
-             radius=~Number_in_Hotel*2) %>%
-#             popup=popupBridging,
-#             popupOptions = popupOptions(closeOnClick = TRUE)) %>%
-  addCircles(data = input_asylumpostcodes, 
-             lng =  ~ long, lat = ~ lat, 
-             color = 'black',
-             #stroke = FALSE,  # this removes outlines to circles
-             fillColor = '#9e0059', # Red
-             fillOpacity = 0.5,
-             weight = 1,
-             opacity = .8, # use fillOpacity = 0 if just want outlines
-             radius=~Service_Users*2)%>%
-#             popup=popupAsylum,
-#             popupOptions = popupOptions(closeOnClick = TRUE)) %>%
-  addProviderTiles(providers$CartoDB.Positron) %>% # an alternative is $Esri.NatGeoWorldMap
-  #addTiles() %>% # default is OpenStreetMap
-  addLegendSize(position = "topright",
-                values = input_initialpostcodes$Extra_people, 
-                color = 'black',
-                fillColor = 'green',
-                opacity = .5,
-                title = 'Initial accomodation sites, No. residents (approx)',
-                shape = 'circle',
-                orientation = 'vertical',
-                baseSize = 10,
-                breaks=1) %>%
-  addLegendSize(position = "topright",
-              values = input_bridgingpostcodes$Service_Users, 
-              color = 'black',
-              fillColor = '#dee000', # Yellow
-              opacity = .5,
-              title = 'Afghan Bridging Hotels, No. bedspaces',
-              shape = 'circle',
-              orientation = 'vertical',
-              baseSize = 10,
-                  breaks=3)%>%
-  addLegendSize(position = "bottomright",
-                values = input_asylumpostcodes$Service_Users, 
-                color = 'black',
-                fillColor = '#9e0059', # Red
-                opacity = .5,
-                title = 'Asylum contingency hotels, No. residents',
-                shape = 'circle',
-                orientation = 'vertical',
-                baseSize = 10,
-                breaks=3)%>%
-    addCircleMarkers(data = shared_hotel_data, # this to to add popups without markers
-             lng =  ~ long, lat = ~ lat, 
-             stroke = FALSE,  # this removes outlines to circles
-             fillOpacity = 0, # this removes the fill
-             popup = ~paste0(
-       "<h4>", input_hotelData$Hotel.Name, "</h4>",
-      
-      "<table style='width:100%'>",
-   
-      "<tr>",
-      "<th>Post code</th>",
-      "<th>", input_hotelData$Postcode,
-      "</tr>",
-      
-      "<tr>",
-      "<tr>",
-      "<th>Borough</th>",
-      "<th>", input_hotelData$LA,
-      "</tr>",
-      
-      "<tr>",
-      "<tr>",
-      "<th>Type of hotel</th>",
-      "<th>", input_hotelData$Type,
-      "</tr>",
-      
-      "<tr>",
-      "<tr>",
-      "<th>Service Users</th>",
-      "<th>", input_hotelData$Service_Users_All, "</th>",
-      "</tr>"
-          )
-      )
-hotels_map
 
 ```
 
+### Map - Another topic
 
-Data (all) table {data-icon="ion-grid"}
-=====================================  
+```{r map9}
 
-### Dataset for "Fair Shares" Model
+# another map
 
-Row {data-height=250}
------------------------------------------------------------------------
-### Filters
-
-```{r filters6}
-
-# Convert data for use in DT and crosstalk
-
-input_Table_Data <- fread(paste0(data_dir,"Table_Data.csv"))%>% 
-  data.frame()
-
-shared_Table_Data <- SharedData$new(input_Table_Data)
-
-bscols(widths = c(3,NA),  
-       list(
-  filter_select(
-  id = "BoroughName",
-  label = "_Borough",
-  sharedData = shared_Table_Data, 
-  group = ~BoroughName
-  )
-),  
-filter_checkbox(
-    id = "Inner",
-    label = "Zone of Greater London",
-    sharedData = shared_Table_Data,
-    ~ifelse(Inner == 1, "Inner", "Outer")
-))
-#filter_slider(
-#    id = "UASC",
-#    label = "Number of Unaccompanied Children",
-#    sharedData = shared_migration_data,
-#    column = ~UASC,
-#    step = 10,
-#    round = TRUE,
-#    sep = "",
-#    ticks = FALSE
-#),
-#filter_slider(
-#    id = "Pop_child_2020",
-#    label = "Number of children under 18 y.o. in borough",
-#    sharedData = shared_migration_data,
-#    column = ~Pop_child_2020,
- #   step = 1,
-#    round = TRUE,
-#    sep = "",
- #   ticks = FALSE
-# ))
 ```
-
-Row {data-height=750}
------------------------------------------------------------------------
-
-### Data Table
-
-```{r datatable6}
-
-shared_Table_Data  %>% 
-  DT::datatable(
- #   filter = "top",  # allows filtering on each column
-    extensions = c(
-      "Buttons",  # add download buttons, etc
-      "Scroller"  # for scrolling down the rows rather than pagination
-    ),
-    fillContainer = FALSE, 
-    rownames = FALSE,  # remove rownames
-    style = "bootstrap",
-    class = "compact",
-    width = "100%",
-    options = list(
-      dom = "Blrtip",  # specify content (search box, etc)
-        # B = Buttons
-        # l - length changing input control
-        # r - processing display element
-        # t - The table!
-        # i - Table information summary
-        # p - pagination control
-      deferRender = TRUE, # speeds initialisation
-      scrollY = 300, # for vertical scrolling
-      scrollX = TRUE,
-      fixedColumns = list(leftColumns = 0),
-      scroller = TRUE, 
-      buttons = list(
-        I("colvis"),  # turn columns on and off
-        "copy", 
-        "print", list(
-        extend = 'collection',
-        buttons = c('csv', 'excel', 'pdf'),
-        text = 'Download'
-      ))
-    ),
-    colnames = c(
-      "Borough" = "BoroughName",
-      "Pledge" = "MidPledge",
-      "Dispersed" = "SeekingAsylumInDispersal",
-      "In hotel" = "SeekingAsylumInHotels",
-      "UASC in care" = "UASCinCare",
-      "Resettled" = "RefugeesResettled"
-    )
-  )
-```
-
-
-Information {data-orientation=columns  data-icon="ion-information-circled"}
-===================================== 
-
-
-Column {data-width=333}
------------------------------------------------------------------------
-
-### Background
-
-Central government is working with local authorities to develop a full asylum dispersal model, supported by grant funding. It has been agreed that regional allocations will be based on population data, but the regions can develop their own individual regionsal dispersal models if they wish.
-
-London Councils have been working with boroughs and the London Strategic Migration Partnership to develop a draft model for the London regional dispersal plan. 
-
-All partners concur that allocations should use a "place-based approach", meaning being sensitive to local contexts, and having a joined up ask of councils and their partners across different Home Office schemes, especially resettlement, asylum dispersal and the National Transfer Scheme. 
-
-Thus this interactive report has been developed by the GLA with the following goals - to <br>
-1) facilitate the implementation and maintenance of a ‘fair share’ approach across London to the support of refugee and people seeking asylum, and <br>
-2) enable the funding and development of services that are ‘place based’ to maximise opportunities for support and social integration available for these groups.
-
-
-
-
-
-
-
-Column {data-width=333}
------------------------------------------------------------------------
-### How to use 
-
-#### Filters
-
-You can:
-
-* Select one or more boroughs from the dropdown menu (remove them with your backspace key)
-* Select boroughs in inner or outer London using the checkbox
-* Drag the sliders to filter boroughs by criteria such as population
-
-#### Interactive map
-
-You can:
-
-* Click to grab and drag the map around
-* Zoom with the ‘+’ and ‘–’ buttons (top-left) or with your mouse’s scroll wheel
-* Click the button showing a broken square (top-left under the zoom options) to select points on the map using a window that’s draggable (click and hold the grid icon in the upper left) and resizeable (click and drag the white boxes in each corner)
-
-#### Datatable
-
-You can:
-
-* Change which columns are visible by clicking the 'Column visibility' button
-* Click 'Download' to save the filtered data to a .csv, .xlsx or .pdf file
-
-
-Column {data-width=333}
------------------------------------------------------------------------
-### Tools
-
-[R v4.1.3](https://www.r-project.org/) and [RStudio 2022.02.1](https://www.rstudio.com/) were used to build this tool.
-
-The packages used were:
-
-* [Flexdashboard](https://rmarkdown.rstudio.com/flexdashboard/) to create a frame for the content
-* [Leaflet](https://rstudio.github.io/leaflet/) for the interactive map
-* [DT](https://rstudio.github.io/DT/) for the interactive table
-* [Crosstalk](https://rstudio.github.io/crosstalk/) for widget interactivity
-* [Ion icons](https://ionicons.com/) for icons
-
-This dashboard was inspired by that of Matt Dray, and his code provided the foundation of the code for the current dashboard.
-
-See [github.com/matt-dray/earl18-crosstalk](https://github.com/matt-dray/earl18-crosstalk)
-
-The code for this tool is available from: ADD LINK TO MY CODE 
-
-For any queries:
-
-* About the interactive report, contact Veronica.Tuffrey@london.gov.uk
-* About the data, contact Mark Winterburn@london.gov.uk
-
-
-
